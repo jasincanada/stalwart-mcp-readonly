@@ -4,3 +4,4 @@ Read-only, evidence-grade MCP server for Stalwart Mail Server (JMAP). Design stu
 Studies:
 
 - [Stalwart API study](docs/stalwart-api.html) covers the mail JMAP door and the management JMAP door for this server.
+- [App ideas](docs/stalwart-app-ideas.html) lists the programs worth building on those two doors.

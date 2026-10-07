@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stalwart app ideas</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: Georgia, "Iowan Old Style", serif; line-height: 1.5; max-width: 44rem; margin: 2rem auto; padding: 0 1.25rem; }
+  h1, h2, h3 { font-family: "Segoe UI", sans-serif; line-height: 1.25; }
+  code { font-family: Consolas, "Courier New", monospace; }
+  a { color: inherit; }
+  .note { border-left: 4px solid #888; padding-left: 0.8rem; }
+</style>
+</head>
+<body>
+<h1>App ideas for the Stalwart API</h1>
+<p>Written 2026-10-07, next to the <a href="stalwart-api.html">API study</a>. These are the programs worth building. Each one uses one door. None of them need both an API key and a mailbox password in the same process.</p>
+<p class="note">The official <a href="https://github.com/stalwartlabs/cli">stalwart-cli</a> already is the general admin client. It downloads <code>/api/schema</code> and can get, query, create, and update every management object. Do not rebuild that. Build the narrow tools below.</p>
+
+<h2>1. Read-only mailbox MCP</h2>
+<p>This is the repo's own job, and it is still the best first app. Door 1 only. An app password with read rights. Methods: <code>Mailbox/query</code>, <code>Email/query</code>, <code>Email/get</code>. Return headers, dates, mailbox names, and short snippets. Do not implement send. Do not write mail into git.</p>
+<p>Why it fits: a person can ask "what arrived from this domain last week" without handing an agent the account password or the right to submit mail. The session call we already proved works is the whole login.</p>
+
+<h2>2. Header and authentication export</h2>
+<p>Door 1. A small command that, given a message id, writes a JSON file of the headers that matter in a dispute: From, To, Date, Message-ID, Received, Authentication-Results, and DKIM-Signature. It does not save the body.</p>
+<p>Why it fits: the SMTP test on this server showed the signed copy and the JMAP draft are different objects. An export that records which copy you opened, and whether DKIM headers are present, is more useful than another mail client.</p>
+
+<h2>3. Outbound delivery doctor</h2>
+<p>Door 2. Read <code>x:QueuedMessage/query</code> and open <code>GET /api/live/delivery/{domain}</code>. Show one page: queued, retry time, and the live stages (DNS, TLS, SMTP reply). No button that deletes a queue item in version one.</p>
+<p>Why it fits: when a message sits, the admin UI makes you hunt. A page that answers "is it DNS, TLS, or the remote server" is the daily tool. Live delivery is not an enterprise-only stream.</p>
+
+<h2>4. DKIM key watch</h2>
+<p>Door 2. Read <code>x:Domain</code> and <code>x:DkimSignature</code>. Compare the active selector with the TXT record in DNS. Warn when a key is marked active but is not published, or when a retiring key is the only one that resolves.</p>
+<p>Why it fits: the 0.16.25 changelog includes a bug where a failed key rotation retires the old key and mail goes out unsigned. A watch that runs every morning catches that before a recipient does.</p>
+
+<h2>5. Credential expiry list</h2>
+<p>Door 2, read-only. <code>x:ApiKey/query</code> and <code>x:AppPassword/query</code>. Show description, created date, expiry, and allowed IPs. Never request or print the secret field. A later version can revoke by id. Creating an app password for another person is not available to an admin, so this app should not pretend it can.</p>
+<p>Why it fits: secrets are shown once and then only a hash remains. The useful program is the inventory, not a second copy of the secret.</p>
+
+<h2>6. Listener and certificate checklist</h2>
+<p>Door 2. Read <code>x:NetworkListener</code> and <code>x:Certificate</code>. Print a table of bind address, port, TLS mode, and certificate expiry. Flag listeners whose address is not on this machine.</p>
+<p>Why it fits: after the upgrade, two configured listener addresses failed to bind and the real ports still came up. A checklist makes that visible without reading the log file.</p>
+
+<h2>What not to build yet</h2>
+<ul>
+<li>A general settings editor. <code>stalwart-cli</code> and the admin UI already do this, and a homemade editor can break mail.</li>
+<li>One program that holds an API key and a mailbox password. Split them into two apps so a mail-reading bug cannot change server settings.</li>
+<li>A sender. Submission works, and local delivery can keep an unsigned draft while skipping the signed copy as a duplicate. A send button needs its own design, after the read path is boring and correct.</li>
+</ul>
+</body>
+</html>
