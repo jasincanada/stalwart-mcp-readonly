@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stalwart API study</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: Georgia, "Iowan Old Style", serif; line-height: 1.5; max-width: 44rem; margin: 2rem auto; padding: 0 1.25rem; }
+  h1, h2, h3 { font-family: "Segoe UI", sans-serif; line-height: 1.25; }
+  code, pre { font-family: Consolas, "Courier New", monospace; }
+  pre { padding: 0.8rem 1rem; overflow: auto; background: #f4f4f4; color: #111; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #bbb; padding: 0.4rem 0.55rem; text-align: left; vertical-align: top; }
+  th { font-family: "Segoe UI", sans-serif; }
+  a { color: inherit; }
+  .note { border-left: 4px solid #888; padding-left: 0.8rem; }
+</style>
+</head>
+<body>
+<h1>Stalwart API study</h1>
+<p>Written 2026-10-07 for the server at version 0.16.25. This page is a coding map. It does not contain passwords, keys, or mail.</p>
+<p class="note">Stalwart does not offer one API key that both reads mail and administers the server. It offers two JMAP APIs. They share the same JSON shape, then split.</p>
+
+<h2>The shape every call uses</h2>
+<p>A call is one HTTP POST. Several methods can ride in the same body. The server answers with <code>methodResponses</code> in the same order.</p>
+<pre>{
+  "using": ["urn:ietf:params:jmap:core"],
+  "methodCalls": [
+    ["Method/name", { }, "call-1"]
+  ]
+}</pre>
+<p>There is no large REST catalogue of mail routes. The official reference for the management objects is <a href="https://stalw.art/docs/ref/">stalw.art/docs/ref/</a>. The helper HTTP routes are documented at <a href="https://stalw.art/docs/development/api/">stalw.art/docs/development/api/</a>.</p>
+
+<h2>Door 1: mail</h2>
+<p>This is the door a mailbox tool should use.</p>
+<table>
+<tr><th>Item</th><th>Value on this server</th></tr>
+<tr><td>Session</td><td><code>GET https://webmail.cryptocomputing.ca/jmap/session</code></td></tr>
+<tr><td>Calls</td><td><code>POST</code> the <code>apiUrl</code> from that session. Today that is <code>https://webmail.cryptocomputing.ca/jmap/</code></td></tr>
+<tr><td>Login</td><td><code>Authorization: Basic</code> with the account password or an app password. An OAuth access token also works as <code>Authorization: Bearer</code>. An API key does not open this door.</td></tr>
+<tr><td>Spec</td><td>RFC 8620, plus the mail, submission, and calendar JMAP specs</td></tr>
+</table>
+<p>The session returns the account id and the methods the account may call. The methods a mail client needs first are <code>Mailbox/query</code>, <code>Email/query</code>, <code>Email/get</code>, <code>Email/set</code>, <code>EmailSubmission/set</code>, and <code>Identity/get</code>. Upload a large attachment with a POST to the session's <code>uploadUrl</code>, then refer to the returned blob id.</p>
+<p>On this host, nginx forwards only <code>/jmap</code> on <code>webmail.cryptocomputing.ca</code> to Stalwart. The rest of that host is the webmail application.</p>
+<p>IMAP on port 1143 and SMTP submission on port 1587 accept the same account password or app password. They also advertise <code>OAUTHBEARER</code> and <code>XOAUTH2</code>. Most mail programs cannot use those token mechanisms, which is why an app password exists.</p>
+
+<h2>Door 2: administration</h2>
+<p>This is the door a server tool should use.</p>
+<table>
+<tr><th>Item</th><th>Value on this server</th></tr>
+<tr><td>Calls</td><td><code>POST https://emailadmin.cryptocomputing.ca/api</code></td></tr>
+<tr><td>Schema</td><td><code>GET https://emailadmin.cryptocomputing.ca/api/schema</code></td></tr>
+<tr><td>Who am I</td><td><code>GET /api/account</code> returns permissions, edition, and locale</td></tr>
+<tr><td>Login</td><td>Basic auth for a person. For a program, create an API key and send <code>Authorization: Bearer</code> with that key.</td></tr>
+<tr><td>Capability</td><td>Add <code>urn:stalwart:jmap</code> to the <code>using</code> array</td></tr>
+</table>
+<p>Nginx on <code>emailadmin.cryptocomputing.ca</code> forwards the whole site to Stalwart. That is the right base URL for this door.</p>
+<p>Method names look like <code>x:Account/query</code>, <code>x:Domain/get</code>, and <code>x:DkimSignature/set</code>. Settings that exist once per server use the id <code>singleton</code>. For example, <code>x:Imap/get</code> is called with <code>&quot;ids&quot;: [&quot;singleton&quot;]</code>. Real lists, such as accounts, domains, and keys, use <code>query</code>, then <code>get</code>, then <code>set</code>.</p>
+<p><code>set</code> accepts <code>create</code>, <code>update</code>, and <code>destroy</code>. The secret for a new API key or app password comes back once, inside <code>created</code>. After that the server stores only a hash.</p>
+<p>The schema endpoint is the spec a program should trust. It is JSON Schema for every object, field, and enum on this exact server version. The official <a href="https://github.com/stalwartlabs/cli">stalwart-cli</a> downloads that schema and builds its commands from it. A client can do the same and avoid hard-coding the object list. The human catalogue is the reference linked above.</p>
+<p>A call the identity is not allowed to make returns a JMAP error. It does not return an empty list. <code>GET /api/account</code> shows the permission list for the signed-in identity. An API key can inherit the account's rights, drop some of them, or carry only an explicit list.</p>
+
+<h2>Objects to learn first</h2>
+<ul>
+<li><code>Account</code>, <code>Domain</code>, <code>DkimSignature</code></li>
+<li><code>ApiKey</code> and <code>AppPassword</code></li>
+<li><code>NetworkListener</code> and <code>QueuedMessage</code></li>
+<li>Singletons: <code>Imap</code>, <code>Jmap</code>, <code>Authentication</code>, <code>SystemSettings</code></li>
+</ul>
+<p>Enterprise-only objects are marked in the catalogue. Live tracing and live metrics are in that group. This server currently logs that its enterprise license does not renew, so those two streams should be treated as unavailable.</p>
+
+<h2>Credentials, in one paragraph</h2>
+<p>An app password replaces the mailbox password on Door 1 and on IMAP or SMTP. Create it while signed in as the mailbox owner, under Account, Credentials, App Passwords. An administrator can see and revoke one, and cannot create one for someone else. An API key opens Door 2 only. It cannot read or send mail. Create it under Account, Credentials, API Keys. Both secrets are shown once.</p>
+
+<h2>What to build</h2>
+<p>A mailbox tool should use Door 1 only. Start with Basic auth against <code>/jmap/session</code>, store <code>apiUrl</code> and the account id, and ignore <code>/api</code>.</p>
+<p>A server tool should use Door 2 only. Point it at <code>https://emailadmin.cryptocomputing.ca</code>, send an API key as a bearer token, and fetch <code>/api/schema</code> before the first real call. The JSON envelope above is the entire client.</p>
+</body>
+</html>
