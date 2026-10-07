@@ -3,9 +3,11 @@
 **Research checked:** 2026-10-07  
 **Scope:** Credentials for a Stalwart-backed email MCP, with emphasis on restricting the consequences of prompt injection and credential theft.
 
+**Version reference:** Upstream changelog latest entry checked: **v0.16.25, 2026-10-05**. A deployed server may use another version.
+
 ## Executive summary
 
-The Stalwart project sources reviewed establish protocol support, but do **not** verify the current app-password feature, its format/storage/revocation/scopes, admin API key behavior, exact permission names, OAuth/OIDC support for each protocol, two-factor interactions, or credential-use audit events. These are **UNVERIFIED**, not assumptions that the features are absent. Do not configure an MCP using guessed permission names, endpoints, or configuration keys. Obtain the version-matched official Stalwart documentation and test the restriction boundary before deployment. [Stalwart project README](https://github.com/stalwartlabs/stalwart#readme).
+The current upstream changelog documents app passwords and API keys with limited access, labels, IP restrictions, and expiration dates. It does **not** establish the exact scope/permission model or prove read-only, protocol-only, or mailbox-only restrictions. Stalwart’s official documentation also has specific references for app passwords, API keys, roles, permissions, OAuth/OIDC, 2FA, quotas, and tracing; those documentation pages could not be fetched and their detailed behavior is **UNVERIFIED in this check**. Do not configure an MCP using guessed permission names, endpoints, or configuration keys. Verify against the version-matched pages and test the restriction boundary before deployment. [Stalwart changelog, v0.16.0](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md#0160---2026-04-20).
 
 The consequence is important: least privilege can be specified as a desired security property, but the precise Stalwart credential that achieves it cannot be named from the verified evidence in this study. Until protocol and identity scopes are verified, a separate account and network-level containment are safer assumptions than “read-only app password.”
 
@@ -15,36 +17,41 @@ The consequence is important: least privilege can be specified as a desired secu
 
 | Question | Finding |
 |---|---|
-| Can Stalwart create app-specific passwords? | **UNVERIFIED.** The reviewed upstream README does not document this feature. Verify in current official account/admin documentation for the exact deployed release. |
-| How are app passwords created, formatted, stored, and shown? | **UNVERIFIED.** No format, display/recovery policy, hash/storage scheme, or creation API is asserted here. Verify the official version-matched documentation and implementation. |
-| Can they be revoked individually? | **UNVERIFIED.** Test revocation and confirm outstanding sessions/tokens are invalidated or expire as documented. |
-| Can an app password be read-only, protocol-specific, mailbox-specific, IP-restricted, or expiring? | **UNVERIFIED** for every scope. Do not infer scope from the term “app password.” Verify actual authorization behavior using attempted forbidden operations. |
-| How do app passwords interact with account roles, permissions, quotas, and mailbox ACLs? | **UNVERIFIED.** The exact role/permission names and whether an alternate password inherits the account’s full rights must be checked in primary Stalwart documentation for the installed version. |
-| OAuth 2.0 / OIDC / bearer-token alternatives for JMAP, IMAP, or SMTP? | **UNVERIFIED** per protocol and deployment. RFCs define protocol-level authorization mechanisms and token formats, but do not establish Stalwart support or configuration. See [RFC 8620](https://www.rfc-editor.org/rfc/rfc8620), [RFC 9051](https://www.rfc-editor.org/rfc/rfc9051), [RFC 6409](https://www.rfc-editor.org/rfc/rfc6409), [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749), and [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750). |
-| Management API keys: creation, scope, storage, and revocation? | **UNVERIFIED.** Do not treat any administrative credential as a narrow API key until its documented scope and enforcement are verified. |
-| Two-factor behavior with app passwords, protocol auth, and API keys? | **UNVERIFIED.** Confirm whether second factors protect only interactive login or also credential creation/recovery and whether app passwords bypass interactive MFA by design. |
-| Audit logging of credential use and changes? | **UNVERIFIED.** Confirm which events are logged, fields retained, log integrity/retention, and whether failed authentication and app-password revocation are audited. |
+| Can Stalwart create app-specific passwords? | **Supported in upstream v0.16:** the changelog lists app passwords with limited access, labels, IP address restrictions, and expiration dates. Exact deployment availability is **UNVERIFIED**. [Changelog, v0.16.0](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md#0160---2026-04-20) |
+| How are app passwords created, stored, and shown? | **UNVERIFIED in this check.** The official [App Passwords documentation](https://stalw.art/docs/auth/authentication/app-password/) describes a self-service path at Account → Credentials → App Passwords and secret display at creation; it reportedly stores the secret hashed and does not reveal it later. Confirm the UI, one-time display, and storage claims against the deployed version. |
+| What is their format? | **Verified format change:** since v0.16.3 (2026-04-30), app passwords begin with the literal prefix `app_` instead of `app ` (space). This is a prefix, not a complete password or a credential to reuse. [Changelog, v0.16.3](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md#0163---2026-04-30) |
+| Can they be revoked individually? | **UNVERIFIED in this check.** The [App Passwords](https://stalw.art/docs/auth/authentication/app-password/) and [AppPassword object](https://stalw.art/docs/ref/object/app-password/) references describe credential management, but immediate revocation behavior and the effect on existing authenticated sessions must be tested. |
+| Which scopes are available? | **Partially verified:** the changelog says “limited access” is supported, and confirms IP restrictions and expiry dates. Whether this means read-only, protocol-specific, mailbox-specific, or method-specific scope is **UNVERIFIED**. Do not infer scope from the phrase “app password.” Test forbidden operations. [Changelog, v0.16.0](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md#0160---2026-04-20) |
+| How do app passwords interact with roles, permissions, quotas, and mailbox ACLs? | **UNVERIFIED in this check.** Official references exist for [roles](https://stalw.art/docs/auth/authorization/roles/), [permissions](https://stalw.art/docs/auth/authorization/permissions/), [administrators](https://stalw.art/docs/auth/authorization/administrator/), and [quotas](https://stalw.art/docs/auth/authorization/quotas/); the exact names, `enabledPermissions`/`disabledPermissions` behavior, `maxAppPasswords` default, and cross-protocol/mailbox ACL enforcement were not verified from page text. See [RFC 4314](https://www.rfc-editor.org/rfc/rfc4314.html) and [RFC 9564](https://www.rfc-editor.org/rfc/rfc9564.html) for ACL standards, not Stalwart implementation guarantees. |
+| OAuth 2.0 / OIDC / bearer-token alternatives for JMAP, IMAP, or SMTP? | Stalwart has official [OAuth](https://stalw.art/docs/auth/oauth/) and [OpenID Connect](https://stalw.art/docs/auth/openid/) documentation, but which flow/mechanism is supported for each of JMAP, IMAP, and SMTP is **UNVERIFIED in this check**. Protocol standards include [RFC 8620](https://www.rfc-editor.org/rfc/rfc8620), [RFC 9051](https://www.rfc-editor.org/rfc/rfc9051), [RFC 6409](https://www.rfc-editor.org/rfc/rfc6409), [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749), [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750), and [RFC 7628](https://www.rfc-editor.org/rfc/rfc7628); they do not establish Stalwart deployment support. |
+| Management API keys: existence and restrictions? | **Partially verified:** v0.16 changelog lists limited-access API keys, labels, IP restrictions, and expiry. The official [API Keys](https://stalw.art/docs/auth/authentication/api-key/) and [ApiKey object](https://stalw.art/docs/ref/object/api-key/) pages could not be fetched, so creation steps, scopes, storage, revocation, and suitability for mail access are **UNVERIFIED in this check**. |
+| Two-factor behavior with app passwords, protocol auth, and API keys? | **UNVERIFIED in this check.** Stalwart documents [two-factor authentication](https://stalw.art/docs/auth/authentication/2fa/) and TOTP ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238.html)). Confirm whether app passwords bypass interactive 2FA, and whether second factors protect credential creation/recovery, against the deployed version. |
+| Audit logging of credential use and changes? | **UNVERIFIED in this check.** Stalwart documents [tracing](https://stalw.art/docs/telemetry/tracing/); authentication event names (`auth.success`, `auth.failed`) appear in documentation search results but were not confirmed from page text. Verify emitted events, fields, retention, integrity, and credential-revocation coverage. |
 
-**Evidence boundary:** A protocol’s support for authentication is not proof that Stalwart enables a given mechanism, exposes a specific app-password workflow, or applies the same restrictions to every protocol. The RFCs above are protocol/security standards, not Stalwart feature documentation. For the protocol inventory and raw-message uncertainty, see [09-stalwart-api-capabilities.md](09-stalwart-api-capabilities.md).
+**Version/security note:** The v0.16.15 changelog reports fixing a scoped-credential privilege-escalation issue involving `SysApiKeyCreate` or `SysApiKeyUpdate` permissions. Use a release containing that fix and do not grant credential-management permissions to an MCP identity without a demonstrated need. This does not establish that all scoped-credential configurations are safe. [Changelog, v0.16.15](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md#01615---2026-07-26).
+
+Stalwart’s v0.16.3 changelog changed the app-password prefix to `app_`. A wrong, expired, or unknown app password/API key is also mentioned in v0.16.25 IMAP-authentication fixes; this does not document revocation/session semantics. [Changelog](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md).
+
+**Evidence boundary:** A protocol’s support for authentication is not proof that Stalwart enables a given mechanism or applies the same restrictions to every protocol. The RFCs above are protocol/security standards, not Stalwart feature documentation. For the protocol inventory and raw-message uncertainty, see [09-stalwart-api-capabilities.md](09-stalwart-api-capabilities.md).
 
 ## Least-privilege designs (recommendations)
 
-The following are security targets and deployment blueprints, not verified Stalwart procedures. Each place that depends on Stalwart-specific controls is explicitly marked **UNVERIFIED**. “Exact permissions required” cannot be supplied safely until official permission names and method-to-permission mapping are verified; none are invented here.
+The following are security targets and deployment blueprints, not verified Stalwart procedures. Each place that depends on Stalwart-specific controls is explicitly marked **UNVERIFIED**. “Limited access” app passwords/API keys, IP restrictions, and expiration dates are documented for v0.16, but “read-only” and exact permission names/method mappings have not been verified; none are invented here.
 
 ### (a) Read-only MCP
 
 **Target:** A dedicated principal can search/list/read only the intended mailbox data. It cannot change flags, move/delete mail, send, administer accounts, or manage Sieve.
 
-**Least privilege achievable in Stalwart:** **UNVERIFIED.** No verified read-only app-password scope or exact read permission is established here. If credentials simply inherit the full account’s rights, a credential labeled “app password” does not reduce the MCP’s authority.
+**Least privilege achievable in Stalwart:** **Partially verified; read-only scope remains UNVERIFIED.** Stalwart v0.16 documents limited-access app passwords, labels, IP restrictions, and expiry, but the sources reviewed do not establish a read-only scope or exact read permission. If credentials simply inherit the full account’s rights, a credential labeled “app password” does not reduce the MCP’s authority.
 
 **Placeholder setup blueprint (confirm every marked item before use):**
 
 1. Create a separate mailbox/service principal such as `mcp-read@example.test`; do not reuse a human administrator or the mailbox owner’s everyday credential. **UNVERIFIED:** exact supported account-creation procedure.
 2. Grant only read/search access to the required mailbox using the documented account permission or mailbox ACL, if Stalwart supports that distinction. **UNVERIFIED:** permission/ACL names, inheritance, and whether mailbox ACLs cover JMAP and IMAP equally.
-3. Create an app-specific credential only if official documentation confirms its scope. If it cannot be constrained to read-only, do not represent it as read-only. **UNVERIFIED:** creation UI/API, protocol binding, expiry, and secret format.
+3. In the documented account credential area (official docs say Account → Credentials → App Passwords), create an app-specific credential with a label such as `mcp-read`; select the narrowest available scope, an expiry, and an allowed source IP if available. **UNVERIFIED in this check:** deployed UI path and option semantics. If it cannot be constrained to read-only, do not represent it as read-only.
 4. Configure the MCP for only the selected read protocol and mailbox. Keep SMTP submission, mailbox mutations, Sieve, and management access unavailable at the process/network level.
 5. Test allowed and denied cases with synthetic mail: search, read, raw export; then attempt flag, move, delete, send, and admin operations. Require denials at the server boundary, not merely a hidden MCP tool.
-6. Store the secret in the deployment’s approved secret store; rotate by issuing a replacement, verifying it, then revoking the old credential. **UNVERIFIED:** Stalwart’s rotation/revocation procedure and session invalidation timing.
+6. Store the generated value securely; official docs reportedly show the secret only at creation and store it hashed. **UNVERIFIED in this check:** one-time display/storage behavior. For rotation, create a replacement, verify it, revoke the old credential, and test that the old value no longer authenticates; revocation and session invalidation semantics are **UNVERIFIED**.
 
 **Stolen credential impact:** The thief can perform every operation the authenticated principal can perform through every reachable enabled protocol until the credential is revoked or otherwise expires. If read-only enforcement is not server-side, this may include changing/deleting mail or sending as the account. This is a threat-model consequence, not a Stalwart-specific claim about current permissions.
 
@@ -52,7 +59,7 @@ The following are security targets and deployment blueprints, not verified Stalw
 
 **Target:** The MCP may prepare drafts but cannot send, alter unrelated mail, or administer the server.
 
-**Least privilege achievable in Stalwart:** **UNVERIFIED.** The reviewed sources do not prove that draft creation can be separated from sending or that a permission exists for draft-only writes.
+**Least privilege achievable in Stalwart:** **UNVERIFIED.** Limited-access credentials exist, but the reviewed sources do not prove that draft creation can be separated from sending or that a draft-only permission exists.
 
 **Placeholder setup blueprint:**
 
@@ -68,7 +75,7 @@ The following are security targets and deployment blueprints, not verified Stalw
 
 **Target:** Read/search and explicitly authorized message mutations, optionally including send. This is the broadest and highest-risk profile.
 
-**Least privilege achievable in Stalwart:** **UNVERIFIED.** Exact method-level permission support, app-password scoping, and separation of send from read/write were not established.
+**Least privilege achievable in Stalwart:** **Partially verified.** Limited-access API keys/app passwords exist; exact method-level permission support, their suitability for mail access, and separation of send from read/write were not established.
 
 **Placeholder setup blueprint:**
 
@@ -79,6 +86,10 @@ The following are security targets and deployment blueprints, not verified Stalw
 5. Exercise all allowed and denied cases. Audit the exact principal and operation. Rotate and revoke via documented release-specific steps. **UNVERIFIED:** APIs, audit event coverage, and session invalidation.
 
 **Stolen credential impact:** The thief can search/read and perform every enabled mutation within the principal’s reach; if submission is allowed, they may send messages as the account. A broad mailbox ACL can expose or affect shared-mailbox contents. Actual Stalwart authorization outcomes remain **UNVERIFIED** until tested.
+
+### Explicit least-privilege boundary
+
+**Not established / treat as unavailable until proven:** The sources verified here do not demonstrate that Stalwart can issue a credential restricted to read-only mail, draft-only writes, a selected protocol, or selected mailboxes. This is not a claim that Stalwart can never provide those controls; it means none of the three MCP profiles may be deployed on the assumption that it does. If the deployed release cannot enforce the required boundary at the server, Stalwart alone cannot provide that least-privilege profile. Do not enable the affected write/read integration until a test proves the restriction.
 
 ## Controls if Stalwart cannot express the required least privilege
 
@@ -93,7 +104,8 @@ Whether each control is available in a deployment is **UNVERIFIED** and must be 
 
 ## Sources and verification notes
 
-- Stalwart upstream [README](https://github.com/stalwartlabs/stalwart#readme), checked 2026-10-07; moving branch and not a credential reference.
+- Stalwart upstream [CHANGELOG.md](https://github.com/stalwartlabs/stalwart/blob/main/CHANGELOG.md), checked 2026-10-07: v0.16.0 documents limited-access app passwords and API keys with labels, IP restrictions, and expiry; v0.16.3 changes the app-password prefix; v0.16.15 fixes the cited scoped-credential issue.
+- Official Stalwart documentation pages: [App Passwords](https://stalw.art/docs/auth/authentication/app-password/), [API Keys](https://stalw.art/docs/auth/authentication/api-key/), [Roles](https://stalw.art/docs/auth/authorization/roles/), [Permissions](https://stalw.art/docs/auth/authorization/permissions/), [OAuth](https://stalw.art/docs/auth/oauth/), [OpenID Connect](https://stalw.art/docs/auth/openid/), [2FA](https://stalw.art/docs/auth/authentication/2fa/), [Quotas](https://stalw.art/docs/auth/authorization/quotas/), [Tracing](https://stalw.art/docs/telemetry/tracing/). Their content could not be directly fetched in this check; page-specific claims are marked **UNVERIFIED in this check**.
 - [RFC 8620](https://www.rfc-editor.org/rfc/rfc8620) (JMAP Core), [RFC 9051](https://www.rfc-editor.org/rfc/rfc9051) (IMAP4rev2), and [RFC 6409](https://www.rfc-editor.org/rfc/rfc6409) (message submission) define protocol contexts, not Stalwart feature support.
 - [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749) (OAuth 2.0) and [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750) (bearer token standard) define standards, not Stalwart’s provider/configuration.
-- **Not verified:** app-password workflow/semantics, API key scopes, exact permissions, OAuth/OIDC support by protocol, MFA behavior, audit events, quotas/ACL interaction, and revoke/rotation/session invalidation. Resolve against official documentation and source for the precise deployed release, then test with a non-production principal.
+- **Not verified:** exact app-password workflow/storage/revocation behavior, API key scopes, permission names, OAuth/OIDC support by protocol, MFA behavior, audit events, quota/ACL interactions, and revoke/rotation/session invalidation. Resolve against the linked official documentation and source for the precise deployed release, then test with a non-production principal.
