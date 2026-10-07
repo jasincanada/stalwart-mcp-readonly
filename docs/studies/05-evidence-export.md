@@ -52,7 +52,10 @@ Use synthetic examples such as `user@example.test` in documentation/tests.
 
 1. Authenticate as the constrained principal; record configured scope using a
    non-network `source_label` (for example `synthetic-source`), software version,
-   UTC acquisition start, JMAP account state and thread ID.
+   UTC acquisition start and thread ID. Record distinct Email and Thread state
+   tokens from `Email/get` and `Thread/get`, respectively, for that account
+   ([RFC 8620 §5.1](https://www.rfc-editor.org/rfc/rfc8620.html#section-5.1)).
+   Session `state` and search `queryState` are not substitutes for these tokens.
 2. Use `Thread/get` to freeze the accessible thread's Email ID set, record missing
    IDs/errors, and check mailbox/account authorization per Email. Do not group by
    subject or assume matching Message-ID means the same Email object.
@@ -69,7 +72,10 @@ Use synthetic examples such as `user@example.test` in documentation/tests.
    written; compare independent disk rehash before finalizing.
 5. Optionally store separately decoded attachment payloads, without changing
    `.eml`. Write both CSVs, then recheck accessible thread membership and message
-   blob mappings. Compare relevant state; fail conservatively on changes.
+   blob mappings with fresh `Thread/get` and `Email/get`. Require consistent
+   per-type state throughout acquisition and compare before/after tokens within
+   the same type/account; fail conservatively on changes. Record both types'
+   tokens, not a single ambiguous “account state.”
 6. Close and sync files; create `ARTIFACTS.csv` inventory; rehash inventory;
    publish directory by a same-filesystem no-overwrite atomic operation. Only
    then return `status: complete` and its inventory SHA-256.
@@ -126,16 +132,22 @@ character allowlists. Do not store subject or address summaries just for conveni
 | `schema_version`, `export_id`, `export_status` | `1`, generated ID, `complete` or `incomplete` repeated per row |
 | `source_label`, `software_version`, `acquisition_started_at`, `acquisition_finished_at` | Operator non-sensitive label, release identifier and local UTC times; not trusted timestamps |
 | `account_id_b64`, `thread_id_b64`, `email_id_b64`, `blob_id_b64`, `mailbox_ids_b64` | Opaque identifiers; mailbox IDs = base64 of a UTF-8 JSON array of strings, sorted bytewise |
-| `account_state_before_b64`, `account_state_after_b64`, `membership_sha256` | State tokens and hash of canonical membership description defined below; empty after-state on failure |
+| `email_state_before_b64`, `email_state_after_b64`, `thread_state_before_b64`, `thread_state_after_b64`, `membership_sha256` | Per-type `Email/get` and `Thread/get` state tokens and membership hash defined below; empty after-state on failure |
 | `ordinal`, `relative_path`, `byte_length`, `sha256` | Actual .eml artifact identity; empty path/length/hash if not successfully acquired and rehashed |
 | `received_at`, `sent_at`, `date_status`, `date_headers_b64` | JMAP metadata times; `date_status` enum `valid`, `missing`, `invalid`, `multiple`; base64 of all raw Date header fields, including folding and field order |
 | `message_id_headers_b64`, `duplicate_of_ordinal` | Original Message-ID fields as raw bytes; first earlier ordinal with identical .eml hash, or empty |
 | `attachment_policy`, `row_status`, `error_code` | `metadata_only` or `extract`; `ok` or `failed`; fixed error enum from study 04, empty for success |
 
 `membership_sha256` hashes UTF-8 JSON of an array of `[emailId, blobId]` pairs,
-sorted by Email ID bytewise, serialized with no insignificant whitespace and
-JSON string escaping. This is our chosen canonical representation, not a JMAP
-standard. Keep the CSV ID fields for independent reconstruction. If blob IDs
+sorted by the UTF-8 bytes of Email ID. Canonical serialization is exactly:
+ASCII array punctuation and commas; no whitespace, BOM or final newline;
+double-quoted strings; escape quotation mark as `\"`, backslash as `\\`, and
+every U+0000–U+001F as lowercase `\u00xx` (no short escapes); emit all other
+Unicode scalar values as literal UTF-8, without slash escaping or Unicode
+normalization. Reject invalid Unicode scalar sequences. This fixes escaping as
+well as whitespace so independent implementations hash identical bytes.
+This is our chosen canonical representation, not a JMAP standard.
+Keep the CSV ID fields for independent reconstruction. If blob IDs
 cannot all be obtained, leave membership hash empty and status incomplete.
 
 `date_status` comes from raw headers: exactly one parseable Date = `valid`, none =

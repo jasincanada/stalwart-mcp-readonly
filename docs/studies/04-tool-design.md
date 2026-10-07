@@ -260,7 +260,8 @@ owner approval; they are not Stalwart or MCP protocol limits.
   silent truncation. Return `LIMIT_EXCEEDED` if a string, collection or response
   exceeds its bound; a paged response must not omit an oversized item.
 - Raw read: whole message only, at most 8 MiB decoded; maximum serialized
-  response 12 MiB. Preserve complete octets; no text conversion or byte ranges
+  MCP response 24 MiB, counting both `structuredContent` and its serialized-text
+  copy, JSON escaping and protocol envelope. Preserve complete octets; no text conversion or byte ranges
   in V1. For larger messages, suggest bounded file export rather than clipping.
 - Export: 100 messages, 32 MiB per message, 16 MiB per extracted attachment,
   256 MiB total artifact bytes including CSVs/inventory. Extraction policy is
